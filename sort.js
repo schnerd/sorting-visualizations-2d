@@ -2,8 +2,6 @@
 
 function color(x, width) {
   return d3.interpolateViridis(x / width);
-  // return "hsla(" + (x / width * 360) + ", 100%, 50%, 1.0)";
-  //return "RGB(" + (x / width * 255) + ", 0, 0)";
 }
 
 function shuffle(array, start, end) {
@@ -20,10 +18,6 @@ var SG_MAGICCONST = 1.0 + Math.log(4.5);
 var LOG4 = Math.log(4.0);
 
 function gamma_distribution(alpha, beta) {
-  /*if (alpha <= 0.0 || beta <= 0.0) {
-    throw new Error('gamma_distribution: alpha and beta must be > 0.0');
-  }*/
-
   if (alpha > 1) {
     var ainv = Math.sqrt(2.0 * alpha - 1.0);
     var bbb = alpha - LOG4;
@@ -99,6 +93,7 @@ function SortingVisualization(data, options, ctx) {
   }
 
   this.data = data;
+  this.captures = [];
 
   this.options = options;
   this.ctx = ctx;
@@ -203,6 +198,26 @@ InsertionSort.prototype.sort = function(y, left, right) {
   }
 };
 
+function StoogeSort() {
+  SortingVisualization.apply(this, arguments);
+}
+
+StoogeSort.prototype = Object.create(SortingVisualization.prototype);
+StoogeSort.prototype.constructor = SortingVisualization;
+
+StoogeSort.prototype.sort = function(y, left, right) {
+  if (this.cmp(this.data[y][right], this.data[y][left])) {
+    this.swap(y, left, right);
+  }
+
+  if (right - left >= 2) {
+    var t = Math.round((right - left) / 3);
+    this.sort(y, left, right - t);
+    this.sort(y, left + t, right);
+    this.sort(y, left, right - t);
+  }
+};
+
 function SelectionSort() {
   SortingVisualization.apply(this, arguments);
 }
@@ -301,6 +316,30 @@ ShellSort.prototype.sort = function(y, left, right) {
         this.swap(y, j, j - gap);
       }
       //this.data[y][j] = temp;
+    }
+  }
+};
+
+function CombSort() {
+  SortingVisualization.apply(this, arguments);
+}
+
+CombSort.prototype = Object.create(SortingVisualization.prototype);
+CombSort.prototype.constructor = SortingVisualization;
+
+CombSort.prototype.sort = function(y, left, right) {
+  var gap = right - left;
+  var sorted = false;
+
+  while (!sorted) {
+    gap = Math.max(Math.floor(gap / options.shrink_factor), 1);
+    sorted = gap === 1;
+
+    for (var i = left; i + gap <= right; i++) {
+      if (this.cmp(this.data[y][i + gap], this.data[y][i])) {
+        sorted = false;
+        this.swap(y, i, i + gap);
+      }
     }
   }
 };
@@ -410,27 +449,44 @@ document.addEventListener('DOMContentLoaded', function() {
   var canvas = document.getElementById('canvas');
   var ctx = canvas.getContext('2d');
 
+  var canvas2 = document.getElementById('canvas-2');
+  var ctx2 = canvas2.getContext('2d');
+  var canvas2dl = document.getElementById('canvas-2-dl');
+  canvas2dl.addEventListener(
+    'click',
+    function() {
+      var dt = canvas2.toDataURL('image/png');
+      this.href = dt;
+    },
+    false,
+  );
+
   var processing = false;
+
+  var desiredCaptures = 100;
 
   var data, sort_visualization;
 
   var algorithms = {
     'Bubble sort': BubbleSort,
     'Insertion sort': InsertionSort,
+    'Stooge sort': StoogeSort,
     'Selection sort': SelectionSort,
     'Cocktail sort': CocktailSort,
     'Odd-even sort': OddEvenSort,
     'Shell sort': ShellSort,
+    'Comb sort': CombSort,
     'Quick sort': QuickSort,
     'Heap sort': HeapSort,
   };
 
   options = {
     width: 100,
-    height: 100,
+    height: 1,
     speed: 1,
     algorithm: 'Bubble sort',
     pivot: 'Start',
+    shrink_factor: 1.3,
     generate: 'Increasing',
     shuffle: function() {
       for (var y = 0; y < data.length; y++) {
@@ -440,6 +496,7 @@ document.addEventListener('DOMContentLoaded', function() {
     },
     zoom: 4,
     start: function() {
+      options.shuffle();
       hide_gui_element('shuffle', true);
       hide_gui_element('start', true);
       hide_gui_element('stop', false);
@@ -449,17 +506,38 @@ document.addEventListener('DOMContentLoaded', function() {
       var algorithm = algorithms[options.algorithm];
       sort_visualization = new algorithm(data, options, ctx);
 
+      options.capture();
+
       for (var y = 0; y < options.height; y++) {
         sort_visualization.sort(y, 0, options.width - 1);
       }
       sort_visualization.sort_end();
 
+      var currentFrame = 1;
+      var totalFrames = d3.max(sort_visualization.swaps, swap => swap.length);
+      var scale = d3
+        .scaleLinear()
+        .domain([0, desiredCaptures - 1])
+        .range([0, totalFrames]);
+      var captureFrames = d3
+        .range(1, desiredCaptures)
+        .map(scale)
+        .map(Math.round);
+
       function step() {
         if (!processing) {
           return;
         }
-        for (var i = 0; i < options.speed; i++) {
-          if (sort_visualization.step()) {
+        for (var i = 0, done; i < options.speed; i++) {
+          done = sort_visualization.step();
+
+          if (captureFrames[0] === currentFrame) {
+            captureFrames.shift();
+            options.capture();
+          }
+          currentFrame++;
+
+          if (done) {
             options.stop();
             return;
           }
@@ -476,7 +554,45 @@ document.addEventListener('DOMContentLoaded', function() {
 
       data = sort_visualization.data;
 
+      options.renderCaptures();
+
       processing = false;
+    },
+    capture: function() {
+      sort_visualization.captures.push(
+        ctx.getImageData(0, 0, canvas.width, canvas.height),
+      );
+    },
+    renderCaptures: function() {
+      var newCaptures = sort_visualization.captures;
+      var renderHeight = Math.floor(canvas2.height / desiredCaptures);
+
+      // Changes rendering algorithm
+      var alwaysRenderFirstRow = true;
+
+      for (var i = 0; i < newCaptures.length; i++) {
+        if (alwaysRenderFirstRow) {
+          ctx2.putImageData(
+            newCaptures[i],
+            0, // dx,
+            i * renderHeight, // dy,
+            0, // dirtyX, - dest x pos
+            0, // dirtyY, - dest y pos
+            canvas2.width, // dirtyWidth,
+            renderHeight * options.zoom, // dirtyHeight
+          );
+        } else {
+          ctx2.putImageData(
+            newCaptures[i],
+            0, // dx,
+            0, // dy,
+            0, // dirtyX, - dest x pos
+            i * renderHeight, // dirtyY, - dest y pos
+            canvas2.width, // dirtyWidth,
+            renderHeight, // dirtyHeight
+          );
+        }
+      }
     },
     distribution: {
       alpha: 1,
@@ -485,7 +601,10 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   function draw(use_visualization_data) {
-    var draw_data = use_visualization_data ? sort_visualization.data : data;
+    var draw_data =
+      use_visualization_data && sort_visualization
+        ? sort_visualization.data
+        : data;
     canvas.width = options.width * options.zoom;
     canvas.height = options.height * options.zoom;
 
@@ -503,6 +622,13 @@ document.addEventListener('DOMContentLoaded', function() {
         );
       }
     }
+
+    canvas2.width = canvas.width;
+    canvas2.height = desiredCaptures * options.zoom;
+    canvas2.style.width = canvas2.width + 'px';
+    canvas2.style.height = canvas2.height + 'px';
+    ctx2.fillStyle = '#cccccc';
+    ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
   }
 
   function resize() {
@@ -544,14 +670,16 @@ document.addEventListener('DOMContentLoaded', function() {
     .name('Algorithm')
     .onChange(function() {
       hide_gui_element('pivot', options.algorithm !== 'Quick sort');
+      hide_gui_element('shrink_factor', options.algorithm !== 'Comb sort');
     });
   gui.add(options, 'pivot', ['Start', 'Middle', 'End', 'Random']).name('Pivot');
+  gui.add(options, 'shrink_factor', 1.001, 3).name('Shrink factor');
   gui
     .add(options, 'generate', ['Increasing', 'Decreasing'])
     .name('Generate')
     .onChange(resize);
   gui.add(options, 'shuffle').name('Shuffle');
-  gui.add(options, 'zoom', 1, 10, 1).name('Zoom').onChange(function() {
+  gui.add(options, 'zoom', 1, 50, 1).name('Zoom').onChange(function() {
     draw(true);
   });
   gui.add(options, 'start').name('Start');
@@ -573,4 +701,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
   hide_gui_element('stop', true);
   hide_gui_element('pivot', true);
+  hide_gui_element('shrink_factor', true);
 });

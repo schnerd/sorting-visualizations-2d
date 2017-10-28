@@ -7,9 +7,17 @@
         <link href="main.css" rel="stylesheet" type="text/css">
     </head>
     <body>
-        <center>
+        <div style="display:flex; align-items: top; margin: 20px;">
+          <div>
             <canvas id="canvas">Your browser doesn't supports canvas.</canvas>
-        </center>
+          </div>
+          <div style="margin-left:20px;">
+              <canvas id="canvas-2">Your browser doesn't supports canvas.</canvas>
+              <div style="margin-top:10px">
+                <a id="canvas-2-dl" href="#" download="canvas.png">Download</a>
+              </div>
+          </div>
+        </div>
         <input type="file" id="image_upload" accept="image/*" style="visibility:hidden">
         <script src="https://d3js.org/d3.v4.min.js"></script>
         <script src="dat.gui.min.js"></script>
