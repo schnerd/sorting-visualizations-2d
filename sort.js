@@ -1,7 +1,8 @@
 'use strict';
 
 function color(x, width) {
-  return "hsla(" + (x / width * 360) + ", 100%, 50%, 1.0)";
+  return d3.interpolateViridis(x / width);
+  // return "hsla(" + (x / width * 360) + ", 100%, 50%, 1.0)";
   //return "RGB(" + (x / width * 255) + ", 0, 0)";
 }
 
@@ -30,7 +31,7 @@ function gamma_distribution(alpha, beta) {
 
     while (true) {
       var u1 = Math.random();
-      if (1e-7 > u1 || u1 > .9999999) {
+      if (1e-7 > u1 || u1 > 0.9999999) {
         continue;
       }
       var u2 = 1.0 - Math.random();
@@ -43,17 +44,17 @@ function gamma_distribution(alpha, beta) {
       }
     }
   } else if (alpha === 1.0) {
-      do {
-        var u = Math.random();
-      } while (u <= 1e-7);
-      return -Math.log(u) * beta;
+    do {
+      var u = Math.random();
+    } while (u <= 1e-7);
+    return -Math.log(u) * beta;
   } else {
     while (true) {
       var u = Math.random();
       var b = (Math.E + alpha) / Math.E;
       var p = b * u;
       if (p <= 1.0) {
-        x = Math.pow(p, (1.0 / alpha));
+        x = Math.pow(p, 1.0 / alpha);
       } else {
         x = -Math.log((b - p) / alpha);
       }
@@ -81,7 +82,10 @@ function beta_distribution(alpha, beta) {
 
 function random() {
   do {
-    var ret = beta_distribution(options.distribution.alpha, options.distribution.beta);
+    var ret = beta_distribution(
+      options.distribution.alpha,
+      options.distribution.beta,
+    );
   } while (ret >= 1);
   return ret;
 }
@@ -129,16 +133,23 @@ SortingVisualization.prototype.step = function() {
       swapped = true;
 
       var step = this.swaps[y].pop();
-      var x1 = step[0], x2 = step[1];
+      var x1 = step[0],
+        x2 = step[1];
 
       var temp = this.original_data[y][x1];
       this.original_data[y][x1] = this.original_data[y][x2];
       this.original_data[y][x2] = temp;
 
-      this.ctx.fillStyle = color(this.original_data[y][x1], this.original_data[y].length);
+      this.ctx.fillStyle = color(
+        this.original_data[y][x1],
+        this.original_data[y].length,
+      );
       this.ctx.fillRect(x1 * zoom, y * zoom, zoom, zoom);
 
-      this.ctx.fillStyle = color(this.original_data[y][x2], this.original_data[y].length);
+      this.ctx.fillStyle = color(
+        this.original_data[y][x2],
+        this.original_data[y].length,
+      );
       this.ctx.fillRect(x2 * zoom, y * zoom, zoom, zoom);
     }
   }
@@ -156,8 +167,7 @@ SortingVisualization.prototype.pivot = function(y, left, right) {
   } else if (options.pivot === 'Random') {
     return left + Math.floor(random() * (right - left));
   }
-}
-
+};
 
 function BubbleSort() {
   SortingVisualization.apply(this, arguments);
@@ -176,7 +186,6 @@ BubbleSort.prototype.sort = function(y, left, right) {
   }
 };
 
-
 function InsertionSort() {
   SortingVisualization.apply(this, arguments);
 }
@@ -193,7 +202,6 @@ InsertionSort.prototype.sort = function(y, left, right) {
     }
   }
 };
-
 
 function SelectionSort() {
   SortingVisualization.apply(this, arguments);
@@ -213,7 +221,6 @@ SelectionSort.prototype.sort = function(y, left, right) {
     this.swap(y, left, min_i);
   }
 };
-
 
 function CocktailSort() {
   SortingVisualization.apply(this, arguments);
@@ -245,7 +252,6 @@ CocktailSort.prototype.sort = function(y, left, right) {
   }
 };
 
-
 function OddEvenSort() {
   SortingVisualization.apply(this, arguments);
 }
@@ -273,7 +279,6 @@ OddEvenSort.prototype.sort = function(y, left, right) {
   }
 };
 
-
 function ShellSort() {
   SortingVisualization.apply(this, arguments);
 }
@@ -288,14 +293,17 @@ ShellSort.prototype.sort = function(y, left, right) {
     var gap = gaps[k];
     for (var i = gap; i <= right; i++) {
       var temp = this.data[y][i];
-      for (var j = i; j >= gap && this.cmp(temp, this.data[y][j - gap]); j -= gap) {
+      for (
+        var j = i;
+        j >= gap && this.cmp(temp, this.data[y][j - gap]);
+        j -= gap
+      ) {
         this.swap(y, j, j - gap);
       }
       //this.data[y][j] = temp;
     }
   }
 };
-
 
 function QuickSort() {
   SortingVisualization.apply(this, arguments);
@@ -306,7 +314,7 @@ QuickSort.prototype.constructor = SortingVisualization;
 
 QuickSort.prototype.partition = function(y, pivot, left, right) {
   var store_index = left,
-      pivot_value = this.data[y][pivot];
+    pivot_value = this.data[y][pivot];
 
   this.swap(y, pivot, right);
 
@@ -333,7 +341,6 @@ QuickSort.prototype.sort = function(y, left, right) {
   this.sort(y, new_pivot + 1, right);
 };
 
-
 function MergeSort() {
   SortingVisualization.apply(this, arguments);
 }
@@ -341,16 +348,13 @@ function MergeSort() {
 MergeSort.prototype = Object.create(SortingVisualization.prototype);
 MergeSort.prototype.constructor = SortingVisualization;
 
-MergeSort.prototype.merge = function(y, left, right) {
-}
+MergeSort.prototype.merge = function(y, left, right) {};
 
 MergeSort.prototype.sort = function(y, left, right) {
   if (left > right) {
     return;
   }
-
 };
-
 
 function HeapSort() {
   SortingVisualization.apply(this, arguments);
@@ -369,7 +373,10 @@ HeapSort.prototype.max_heapify = function(y, i, length) {
       largest = left;
     }
 
-    if (right < length && this.cmp(this.data[y][largest], this.data[y][right])) {
+    if (
+      right < length &&
+      this.cmp(this.data[y][largest], this.data[y][right])
+    ) {
       largest = right;
     }
 
@@ -397,7 +404,6 @@ HeapSort.prototype.sort = function(y, left, right) {
   }
 };
 
-
 var options;
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -409,15 +415,15 @@ document.addEventListener('DOMContentLoaded', function() {
   var data, sort_visualization;
 
   var algorithms = {
-    "Bubble sort": BubbleSort,
-    "Insertion sort": InsertionSort,
-    "Selection sort": SelectionSort,
-    "Cocktail sort": CocktailSort,
-    "Odd-even sort": OddEvenSort,
-    "Shell sort": ShellSort,
-    "Quick sort": QuickSort,
-    "Heap sort": HeapSort
-  }
+    'Bubble sort': BubbleSort,
+    'Insertion sort': InsertionSort,
+    'Selection sort': SelectionSort,
+    'Cocktail sort': CocktailSort,
+    'Odd-even sort': OddEvenSort,
+    'Shell sort': ShellSort,
+    'Quick sort': QuickSort,
+    'Heap sort': HeapSort,
+  };
 
   options = {
     width: 100,
@@ -474,22 +480,27 @@ document.addEventListener('DOMContentLoaded', function() {
     },
     distribution: {
       alpha: 1,
-      beta: 1
-    }
+      beta: 1,
+    },
   };
 
   function draw(use_visualization_data) {
     var draw_data = use_visualization_data ? sort_visualization.data : data;
-    canvas.width  = options.width  * options.zoom;
+    canvas.width = options.width * options.zoom;
     canvas.height = options.height * options.zoom;
 
-    canvas.style.width  = canvas.width  + 'px';
+    canvas.style.width = canvas.width + 'px';
     canvas.style.height = canvas.height + 'px';
 
     for (var y = 0; y < options.height; y++) {
       for (var x = 0; x < options.width; x++) {
         ctx.fillStyle = color(draw_data[y][x], options.width);
-        ctx.fillRect(x * options.zoom, y * options.zoom, options.zoom, options.zoom);
+        ctx.fillRect(
+          x * options.zoom,
+          y * options.zoom,
+          options.zoom,
+          options.zoom,
+        );
       }
     }
   }
@@ -519,14 +530,26 @@ document.addEventListener('DOMContentLoaded', function() {
   resize();
 
   var gui = new dat.GUI();
-  gui.add(options, 'width', 1, window.innerWidth, 1).name('Width').onChange(resize);
-  gui.add(options, 'height', 1, window.innerHeight, 1).name('Height').onChange(resize);
+  gui
+    .add(options, 'width', 1, window.innerWidth, 1)
+    .name('Width')
+    .onChange(resize);
+  gui
+    .add(options, 'height', 1, window.innerHeight, 1)
+    .name('Height')
+    .onChange(resize);
   gui.add(options, 'speed', 1, 25, 1).name('Speed');
-  gui.add(options, 'algorithm', Object.keys(algorithms)).name('Algorithm').onChange(function() {
-    hide_gui_element('pivot', options.algorithm !== 'Quick sort');
-  });
+  gui
+    .add(options, 'algorithm', Object.keys(algorithms))
+    .name('Algorithm')
+    .onChange(function() {
+      hide_gui_element('pivot', options.algorithm !== 'Quick sort');
+    });
   gui.add(options, 'pivot', ['Start', 'Middle', 'End', 'Random']).name('Pivot');
-  gui.add(options, 'generate', ['Increasing', 'Decreasing']).name('Generate').onChange(resize);
+  gui
+    .add(options, 'generate', ['Increasing', 'Decreasing'])
+    .name('Generate')
+    .onChange(resize);
   gui.add(options, 'shuffle').name('Shuffle');
   gui.add(options, 'zoom', 1, 10, 1).name('Zoom').onChange(function() {
     draw(true);
