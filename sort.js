@@ -164,6 +164,49 @@ SortingVisualization.prototype.pivot = function(y, left, right) {
   }
 };
 
+function NonSwappingSortingVisualization() {
+  SortingVisualization.apply(this, arguments);
+  this.stack = [];
+  for (var i = 0; i < this.data.length; i++) {
+    this.stack.push([]);
+  }
+}
+
+NonSwappingSortingVisualization.prototype = Object.create(
+  SortingVisualization.prototype,
+);
+NonSwappingSortingVisualization.prototype.constructor = SortingVisualization;
+
+NonSwappingSortingVisualization.prototype.sort_end = function() {
+  SortingVisualization.prototype.sort_end.apply(this, arguments);
+  for (var y = 0; y < this.stack.length; y++) {
+    this.stack[y].reverse();
+  }
+};
+
+NonSwappingSortingVisualization.prototype.step = function(have_to_draw) {
+  for (var y = 0; y < this.swaps.length; y++) {
+    if (!this.stack[y].length) {
+      draw(this.ctx, this.data, false);
+      return true;
+    }
+
+    var data = this.stack[y].pop();
+    var left = data[0],
+      result = data[1];
+
+    for (var i = 0; i < result.length; i++) {
+      this.data[y][left + i] = result[i];
+    }
+  }
+
+  if (have_to_draw) {
+    draw(this.ctx, this.data, false);
+  }
+
+  return false;
+};
+
 function BubbleSort() {
   SortingVisualization.apply(this, arguments);
 }
@@ -381,17 +424,48 @@ QuickSort.prototype.sort = function(y, left, right) {
 };
 
 function MergeSort() {
-  SortingVisualization.apply(this, arguments);
+  NonSwappingSortingVisualization.apply(this, arguments);
 }
 
-MergeSort.prototype = Object.create(SortingVisualization.prototype);
-MergeSort.prototype.constructor = SortingVisualization;
+MergeSort.prototype = Object.create(NonSwappingSortingVisualization.prototype);
+MergeSort.prototype.constructor = NonSwappingSortingVisualization;
 
-MergeSort.prototype.merge = function(y, left, right) {};
+MergeSort.prototype.merge = function(
+  y,
+  left_start,
+  left_end,
+  right_start,
+  right_end,
+) {
+  var result = [];
+
+  while (left_start <= left_end || right_start <= right_end) {
+    if (left_start <= left_end && right_start <= right_end) {
+      if (this.cmp(this.data[y][left_start], this.data[y][right_start])) {
+        result.push(this.data[y][left_start++]);
+      } else {
+        result.push(this.data[y][right_start++]);
+      }
+    } else if (left_start <= left_end) {
+      result.push(this.data[y][left_start++]);
+    } else {
+      result.push(this.data[y][right_start++]);
+    }
+  }
+
+  return result;
+};
 
 MergeSort.prototype.sort = function(y, left, right) {
-  if (left > right) {
-    return;
+  if (right > left) {
+    var mid = Math.floor((right + left) / 2);
+    this.sort(y, left, mid);
+    this.sort(y, mid + 1, right);
+    var merge = this.merge(y, left, mid, mid + 1, right);
+    for (var i = 0; i < merge.length; i++) {
+      this.data[y][left + i] = merge[i];
+      this.stack[y].push([left + i, [merge[i]]]);
+    }
   }
 };
 
@@ -478,6 +552,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'Comb sort': CombSort,
     'Quick sort': QuickSort,
     'Heap sort': HeapSort,
+    'Merge sort': MergeSort,
   };
 
   options = {
@@ -529,7 +604,7 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
         }
         for (var i = 0, done; i < options.speed; i++) {
-          done = sort_visualization.step();
+          done = sort_visualization.step(i === options.speed - 1);
 
           if (captureFrames[0] === currentFrame) {
             captureFrames.shift();
