@@ -731,7 +731,7 @@ document.addEventListener('DOMContentLoaded', function() {
             0, // dirtyX, - dest x pos
             0, // dirtyY, - dest y pos
             canvas2.width, // dirtyWidth,
-            renderHeight * options.zoom, // dirtyHeight
+            renderHeight, // dirtyHeight
           );
         } else {
           ctx2.putImageData(
