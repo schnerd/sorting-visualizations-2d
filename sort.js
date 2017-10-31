@@ -182,10 +182,13 @@ NonSwappingSortingVisualization.prototype.sort_end = function() {
   for (var y = 0; y < this.stack.length; y++) {
     this.stack[y].reverse();
   }
+
+  this.data = this.original_data;
+  draw(this.ctx, this.data, false);
 };
 
 NonSwappingSortingVisualization.prototype.step = function(have_to_draw) {
-  for (var y = 0; y < this.swaps.length; y++) {
+  for (var y = 0; y < this.stack.length; y++) {
     if (!this.stack[y].length) {
       draw(this.ctx, this.data, false);
       return true;
@@ -517,16 +520,87 @@ HeapSort.prototype.sort = function(y, left, right) {
   }
 };
 
+function RadixSort() {
+  NonSwappingSortingVisualization.apply(this, arguments);
+}
+
+RadixSort.prototype = Object.create(NonSwappingSortingVisualization.prototype);
+RadixSort.prototype.constructor = NonSwappingSortingVisualization;
+
+RadixSort.prototype.sort = function(y, left, right) {
+  var data = this.data[y];
+
+  var maxval = Math.max.apply(null, this.data[y].slice(left, right + 1));
+
+  var it = 0;
+  while (Math.pow(this.options.base, it) <= maxval) {
+    var buckets = [];
+    for (var i = 0; i < this.options.base; i++) {
+      buckets.push([]);
+    }
+
+    for (var i = left; i <= right; i++) {
+      var digit =
+        Math.floor(data[i] / Math.pow(this.options.base, it)) %
+        this.options.base;
+      buckets[digit].push(data[i]);
+    }
+
+    data = [];
+    var start = left;
+    for (var i = 0; i < buckets.length; i++) {
+      for (var j = 0; j < buckets[i].length; j++) {
+        data.push(buckets[i][j]);
+        this.stack[y].push([start++, [buckets[i][j]]]);
+      }
+    }
+
+    it++;
+  }
+};
+
 var options;
 
-document.addEventListener('DOMContentLoaded', function() {
-  var canvas = document.getElementById('canvas');
-  var ctx = canvas.getContext('2d');
+var desiredCaptures = 100;
+var canvas, ctx;
+var canvas2, ctx2;
 
-  var canvas2 = document.getElementById('canvas-2');
-  var ctx2 = canvas2.getContext('2d');
-  var canvas2dl = document.getElementById('canvas-2-dl');
-  canvas2dl.addEventListener(
+function draw(ctx, data, resize) {
+  if (resize) {
+    canvas.width = options.width * options.zoom;
+    canvas.height = options.height * options.zoom;
+
+    canvas.style.width = canvas.width + 'px';
+    canvas.style.height = canvas.height + 'px';
+
+    canvas2.width = canvas.width;
+    canvas2.height = desiredCaptures * options.zoom;
+    canvas2.style.width = canvas2.width + 'px';
+    canvas2.style.height = canvas2.height + 'px';
+    ctx2.fillStyle = '#cccccc';
+    ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
+  }
+
+  for (var y = 0; y < data.length; y++) {
+    for (var x = 0; x < data[y].length; x++) {
+      ctx.fillStyle = color(data[y][x], options.width);
+      ctx.fillRect(
+        x * options.zoom,
+        y * options.zoom,
+        options.zoom,
+        options.zoom,
+      );
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  canvas = document.getElementById('canvas');
+  ctx = canvas.getContext('2d');
+
+  canvas2 = document.getElementById('canvas-2');
+  ctx2 = canvas2.getContext('2d');
+  document.getElementById('canvas-2-dl').addEventListener(
     'click',
     function() {
       var dt = canvas2.toDataURL('image/png');
@@ -536,8 +610,6 @@ document.addEventListener('DOMContentLoaded', function() {
   );
 
   var processing = false;
-
-  var desiredCaptures = 100;
 
   var data, sort_visualization;
 
@@ -552,6 +624,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'Comb sort': CombSort,
     'Quick sort': QuickSort,
     'Heap sort': HeapSort,
+    'Radix sort': RadixSort,
     'Merge sort': MergeSort,
   };
 
@@ -562,12 +635,13 @@ document.addEventListener('DOMContentLoaded', function() {
     algorithm: 'Bubble sort',
     pivot: 'Start',
     shrink_factor: 1.3,
+    base: 2,
     generate: 'Increasing',
     shuffle: function() {
       for (var y = 0; y < data.length; y++) {
         shuffle(data[y], 0, data[y].length);
       }
-      draw();
+      draw(ctx, data, false);
     },
     zoom: 4,
     start: function() {
@@ -589,7 +663,10 @@ document.addEventListener('DOMContentLoaded', function() {
       sort_visualization.sort_end();
 
       var currentFrame = 1;
-      var totalFrames = d3.max(sort_visualization.swaps, swap => swap.length);
+      var totalFrames = d3.max(
+        sort_visualization.stack || sort_visualization.swaps,
+        swap => swap.length,
+      );
       var scale = d3
         .scaleLinear()
         .domain([0, desiredCaptures - 1])
@@ -675,37 +752,6 @@ document.addEventListener('DOMContentLoaded', function() {
     },
   };
 
-  function draw(use_visualization_data) {
-    var draw_data =
-      use_visualization_data && sort_visualization
-        ? sort_visualization.data
-        : data;
-    canvas.width = options.width * options.zoom;
-    canvas.height = options.height * options.zoom;
-
-    canvas.style.width = canvas.width + 'px';
-    canvas.style.height = canvas.height + 'px';
-
-    for (var y = 0; y < options.height; y++) {
-      for (var x = 0; x < options.width; x++) {
-        ctx.fillStyle = color(draw_data[y][x], options.width);
-        ctx.fillRect(
-          x * options.zoom,
-          y * options.zoom,
-          options.zoom,
-          options.zoom,
-        );
-      }
-    }
-
-    canvas2.width = canvas.width;
-    canvas2.height = desiredCaptures * options.zoom;
-    canvas2.style.width = canvas2.width + 'px';
-    canvas2.style.height = canvas2.height + 'px';
-    ctx2.fillStyle = '#cccccc';
-    ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
-  }
-
   function resize() {
     if (processing) {
       return;
@@ -725,7 +771,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
 
-    draw();
+    draw(ctx, data, true);
   }
 
   resize();
@@ -746,16 +792,18 @@ document.addEventListener('DOMContentLoaded', function() {
     .onChange(function() {
       hide_gui_element('pivot', options.algorithm !== 'Quick sort');
       hide_gui_element('shrink_factor', options.algorithm !== 'Comb sort');
+      hide_gui_element('base', options.algorithm !== 'Radix sort');
     });
   gui.add(options, 'pivot', ['Start', 'Middle', 'End', 'Random']).name('Pivot');
   gui.add(options, 'shrink_factor', 1.001, 3).name('Shrink factor');
+  gui.add(options, 'base', 2, 10, 1).name('Base');
   gui
     .add(options, 'generate', ['Increasing', 'Decreasing'])
     .name('Generate')
     .onChange(resize);
   gui.add(options, 'shuffle').name('Shuffle');
   gui.add(options, 'zoom', 1, 50, 1).name('Zoom').onChange(function() {
-    draw(true);
+    draw(ctx, data, true);
   });
   gui.add(options, 'start').name('Start');
   gui.add(options, 'stop').name('Stop');
@@ -777,4 +825,5 @@ document.addEventListener('DOMContentLoaded', function() {
   hide_gui_element('stop', true);
   hide_gui_element('pivot', true);
   hide_gui_element('shrink_factor', true);
+  hide_gui_element('base', true);
 });
